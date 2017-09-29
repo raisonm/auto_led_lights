@@ -1,44 +1,3 @@
-/*
-
-Example sketch 06
-
-PHOTO RESISTOR
-
-  Use a photoresistor (light sensor) to control the brightness
-  of a LED.
-
-Hardware connections:
-
-  Photo resistor:
-  
-    Connect one side of the photoresistor to 5 Volts (5V).
-    Connect the other side of the photoresistor to ANALOG pin 0.
-    Connect a 10K resistor between ANALOG pin 0 and GND.
-
-    This creates a voltage divider, with the photoresistor one
-    of the two resistors. The output of the voltage divider
-    (connected to A0) will vary with the light level.
-    
-  LED:
-  
-    Connect the positive side (long leg) of the LED to
-    digital pin 9. (To vary the brightness, this pin must
-    support PWM, which is indicated by "~" or "PWM" on the
-    Arduino itself.)
-
-    Connect the negative side of the LED (short leg) to a
-    330 Ohm resistor.
-
-    Connect the other side of the resistor to GND.
-
-This sketch was written by SparkFun Electronics,
-with lots of help from the Arduino community.
-This code is completely free for any use.
-Visit http://www.arduino.cc to learn about the Arduino.
-
-Version 2.0 6/2012 MDG
-*/
-
 
 // As usual, we'll create constants to name the pins we're using.
 // This will make it easier to follow the code below.
@@ -54,10 +13,11 @@ const int brightenLight = 7;
 
 int lightLevel, high = 0, low = 1023;
 
-int LEDIntensity = 0;
-int error = 1; // The "wiggle room" for the light to fluctuate away from the desired target_light_intensity
+//int current_led_intensity = 0;
 int target_light_intensity = 80; // 255; // The intensity of light I'm trying to maintain. I believe this will be the same range as the lightLevel: [0, 255]
-int numStepsPosible = 32; // As measured by like...just lying there and counting the number of times I pressed the dimmer switch.
+int error = 1; // The "wiggle room" for the light to fluctuate away from the desired target_light_intensity
+int number_of_dimming_states = 32; // As measured by like...just lying there and counting the number of times I pressed the dimmer switch.
+int current_dimming_statue = 0; // start this at 0 to include the "off" state. this can then incriment 32 times to it's full brightness. (remember this implies that on start the lights should be set dimmed all the way.)
 
 
 void setup()
@@ -126,47 +86,86 @@ void loop()
   // try it out:
 
   manualTune();  // manually change the range from light to dark
-
   int lightInRoom = 255 - lightLevel;
   
   //autoTune();  // have the Arduino do the work for us!
 
   if (lightInRoom > (target_light_intensity + error)) {
-    // Dim Lights if possible
-    if (LEDIntensity > 0) { // If the LED is not OFF
-      LEDIntensity = LEDIntensity - 1; // 1 is just the step for now
-      digitalWrite(dimLight, HIGH);
-      delay(250);
-      digitalWrite(dimLight, LOW);
-//      analogWrite(ledPin, LEDIntensity); // When converting this to use the remote LEDs this will be a single binary call to the remote instead.
-    }
+    increaseLedIntensity();
   } else if (lightInRoom < (target_light_intensity - error)) {
-    //Brighten Lights if possible
-    if (LEDIntensity < numStepsPosible) { // If the LED is not full ON
-      // (fully on can be capped at other values, which means when this is connected to the string of remote controlled LEDs we can set this cap to just...the highest setting on those...)
-      
-      LEDIntensity = LEDIntensity + 1; // 1 is just the step for now.
-      digitalWrite(brightenLight, HIGH);
-      delay(250);
-      digitalWrite(brightenLight, LOW);
-//      analogWrite(ledPin, LEDIntensity); // When converting this to use the remote LEDs this will be a single binary call to the remote instead.
-    }
+    decreaseLedIntensity();
   }
-
-//  Serial.println("lightlevel found: " + String(lightInRoom) + " | LED intensity: " + String(LEDIntensity) + " | global threshold: " + String(target_light_intensity) + " (+/- 1)");
-
-  // The above functions will alter lightLevel to be cover the
-  // range from full-on to full-off. Now we can adjust the
-  // brightness of the LED:
-
-//  analogWrite(ledPin, lightLevel); //moving this up into the  if statement - mraison
-  
-  // The above statement will brighten the LED along with the
-  // light level. To do the opposite, replace "lightLevel" in the
-  // above analogWrite() statement with "255-lightLevel".
-  // Now you've created a night-light!
 }
 
+// press a button by completing the circuit for the button with HIGH for a moment and then opening the circuit with LOW 
+void pressButton(int button)
+{
+  digitalWrite(button, HIGH);
+  delay(250);
+  digitalWrite(button, LOW);
+}
+
+void turnOnLeds()
+{
+  pressButton(onButton);
+}
+
+void turnOffLeds()
+{
+  pressButton(offButton);
+}
+
+void increaseLedIntensity()
+{
+  if (current_dimming_statue == number_of_dimming_states) {
+    // we're maxed out. ya done.
+    return;
+  }
+  
+  if (current_dimming_statue == 0) {
+    Serial.println("turn on");
+    turnOnLeds();
+  } else {
+    Serial.println("increase");
+    pressButton(brightenLight);
+  }
+  
+  if (didButtonWork()) {
+    current_dimming_statue++;
+  }
+}
+
+void decreaseLedIntensity()
+{
+  if (current_dimming_statue == 0) {
+    // If the leds are off then ya done...you can't turn them more off...
+    return;
+  }
+  
+  if (current_dimming_statue == 1) {
+    Serial.println("turn off");
+    turnOffLeds();
+  } else {
+    Serial.println("decrease");
+    pressButton(dimLight);
+  }
+  if (didButtonWork()) {
+    current_dimming_statue--;
+  }
+}
+
+bool didButtonWork()
+{
+  int previousLightLevel = lightLevel;
+  lightLevel = analogRead(sensorPin);
+  manualTune();
+  int diffVal = previousLightLevel - lightLevel;
+  if (diffVal > 2 * error) {
+    return true;
+  } else {
+    return false;
+  }
+}
 
 void manualTune()
 {
