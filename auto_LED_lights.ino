@@ -91,9 +91,9 @@ void loop()
   //autoTune();  // have the Arduino do the work for us!
 
   if (lightInRoom > (target_light_intensity + error)) {
-    increaseLedIntensity();
-  } else if (lightInRoom < (target_light_intensity - error)) {
     decreaseLedIntensity();
+  } else if (lightInRoom < (target_light_intensity - error)) {
+    increaseLedIntensity();
   }
 }
 
